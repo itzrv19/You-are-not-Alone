@@ -269,8 +269,12 @@ function MainApp({ token, user, setToken, setUser }) {
   const handleLogout = () => {
     setToken(null);
     setUser(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     navigate("/login");
   };
+
+  if (!user) return null; // Prevent crash before redirect
 
   if (isBanned) {
     return (
@@ -459,19 +463,36 @@ function MainApp({ token, user, setToken, setUser }) {
 
 // --- ROOT APP ---
 function App() {
-  const [token, setToken] = useState(null);
-  const [user, setUser] = useState(null);
+  // Initialize state from localStorage so refresh doesn't log you out
+  const [token, setToken] = useState(() => localStorage.getItem("token") || null);
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem("user");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [signupEmail, setSignupEmail] = useState("");
+
+  // Keep localStorage synced
+  const handleSetToken = (newToken) => {
+    if (newToken) localStorage.setItem("token", newToken);
+    else localStorage.removeItem("token");
+    setToken(newToken);
+  };
+
+  const handleSetUser = (newUser) => {
+    if (newUser) localStorage.setItem("user", JSON.stringify(newUser));
+    else localStorage.removeItem("user");
+    setUser(newUser);
+  };
 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/login" />} />
-        <Route path="/login" element={<LoginScreen setToken={setToken} setUser={setUser} />} />
+        <Route path="/login" element={<LoginScreen setToken={handleSetToken} setUser={handleSetUser} />} />
         <Route path="/signup" element={<SignupScreen setSignupEmail={setSignupEmail} />} />
-        <Route path="/signup-profile" element={<SignupProfileScreen signupEmail={signupEmail} setToken={setToken} setUser={setUser} />} />
+        <Route path="/signup-profile" element={<SignupProfileScreen signupEmail={signupEmail} setToken={handleSetToken} setUser={handleSetUser} />} />
         <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
-        <Route path="/app" element={<MainApp token={token} user={user} setToken={setToken} setUser={setUser} />} />
+        <Route path="/app" element={<MainApp token={token} user={user} setToken={handleSetToken} setUser={handleSetUser} />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>

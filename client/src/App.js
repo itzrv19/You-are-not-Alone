@@ -224,12 +224,25 @@ function MainApp({ token, user, setToken, setUser }) {
   const [chat, setChat] = useState([]);
   const [msg, setMsg] = useState("");
   const [partner, setPartner] = useState(null); // { codename, email }
+  const [recentPartners, setRecentPartners] = useState(() => {
+    const saved = localStorage.getItem("recentPartners");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [showEmoji, setShowEmoji] = useState(false);
   const [requests, setRequests] = useState([]);
   const [isBanned, setIsBanned] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
 
   const [form, setForm] = useState({ targetGender: "Any" });
+
+  const addRecentPartner = (codename, email) => {
+    setRecentPartners(prev => {
+      const filtered = prev.filter(p => p.email !== email);
+      const updated = [{ codename, email }, ...filtered].slice(0, 10); // Keep last 10
+      localStorage.setItem("recentPartners", JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   useEffect(() => {
     if (!token || !user) {
@@ -244,6 +257,7 @@ function MainApp({ token, user, setToken, setUser }) {
       setAppView("chat");
       setChat([]);
       setPartner({ codename: data.partnerCodename, email: data.partnerEmail });
+      addRecentPartner(data.partnerCodename, data.partnerEmail);
       setShowSidebar(false);
     });
 
@@ -360,6 +374,25 @@ function MainApp({ token, user, setToken, setUser }) {
                 <span className="username">{r.senderCodename}</span>
                 <button className="primary-btn" style={{padding:"5px", fontSize:"0.8rem", marginTop:"5px"}} onClick={() => acceptRequest(r.id)}>
                   Accept & Chat
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <h3 className="section-title" style={{marginTop: 15}}>Recent Contacts</h3>
+          {recentPartners.length === 0 && <p className="empty-text">No recent chats.</p>}
+          {recentPartners.map((rp, i) => (
+            <div key={i} className="user-item">
+              <div className="avatar user-avatar">{rp.codename.charAt(0).toUpperCase()}</div>
+              <div className="user-info">
+                <span className="username">{rp.codename}</span>
+                <button className="primary-btn" style={{padding:"5px", fontSize:"0.8rem", marginTop:"5px", background:"#005c4b"}} onClick={() => {
+                  if (socketRef.current) {
+                    socketRef.current.emit("sendRequest", rp.email);
+                    alert("Friend request sent to " + rp.codename + "!");
+                  }
+                }}>
+                  Send Friend Request
                 </button>
               </div>
             </div>

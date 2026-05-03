@@ -76,7 +76,8 @@ input, select { font-family: inherit; }
   margin-bottom: 10px;
 }
 
-.auth-box input {
+.auth-box input,
+.auth-box select {
   width: 100%;
   padding: 14px 16px;
   border-radius: 8px;
@@ -85,11 +86,14 @@ input, select { font-family: inherit; }
   color: var(--text-main);
   font-size: 16px;
   transition: all 0.3s ease;
+  appearance: none; /* Removes default dropdown arrow to match styling */
 }
 
-.auth-box input:focus {
+.auth-box input:focus,
+.auth-box select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
+  outline: none;
 }
 
 .primary-btn {
@@ -156,6 +160,7 @@ input, select { font-family: inherit; }
   background-color: var(--bg-panel);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   border-bottom: 1px solid var(--border-color);
 }
 

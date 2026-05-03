@@ -6,7 +6,6 @@ const crypto = require("crypto");
 const Filter = require("bad-words");
 const connectDB = require("./db");
 const Message = require("./models/Message");
-const nodemailer = require("nodemailer");
 
 // Attempt to connect to DB
 let isDbConnected = false;
@@ -34,18 +33,9 @@ let users = []; // list of online users: { token, socketId, codename, email }
 let waitingUser = null;
 const bannedEmails = new Set(); // list of banned emails
 
-// Configure Nodemailer
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
 /* REST API ENDPOINTS */
 
-// 1. Send Email OTP
+// 1. Send Email OTP via Google Apps Script (Bypasses Render SMTP Block)
 app.post("/api/send-otp", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email address required" });
@@ -59,17 +49,23 @@ app.post("/api/send-otp", async (req, res) => {
   console.log(`🔑 Your verification code is: ${otp}`);
   console.log(`=========================================\n`);
 
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  if (process.env.GOOGLE_SCRIPT_URL) {
     try {
-      await transporter.sendMail({
-        from: `"You Are Not Alone" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: "Your Sanctuary Verification Code",
-        text: `Your verification code is: ${otp}. It expires in 5 minutes.`,
+      const response = await fetch(process.env.GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          recipient: email,
+          subject: "Your Sanctuary Verification Code",
+          message: `Your verification code is: ${otp}. It expires in 5 minutes.`
+        })
       });
+      
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || "Google Script rejected the request");
+      
     } catch (err) {
-      console.error("Failed to send email:", err.message);
-      return res.status(500).json({ error: "Failed to send email. Check server configuration." });
+      console.error("Failed to trigger Google Script:", err.message);
+      return res.status(500).json({ error: "Failed to trigger email system. Check server configuration." });
     }
   }
 

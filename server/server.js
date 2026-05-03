@@ -264,25 +264,45 @@ io.on("connection", (socket) => {
     if (!isDbConnected) return;
     try {
       const req = await FriendRequest.findById(requestId);
-      if (req && req.receiverEmail === socket.email) {
+      if (req && req.receiverEmail === socket.email && req.status === "pending") {
         req.status = "accepted";
         await req.save();
+
+        // Clean up any reciprocal request (User B -> User A)
+        await FriendRequest.updateMany(
+          { senderEmail: socket.email, receiverEmail: req.senderEmail, status: "pending" },
+          { status: "accepted" }
+        );
 
         const sender = onlineUsers.get(req.senderEmail);
         const me = onlineUsers.get(socket.email);
 
-        if (sender && me && sender.status !== "chatting" && me.status !== "chatting") {
-          sender.status = "chatting";
-          me.status = "chatting";
-          socket.partnerEmail = req.senderEmail;
-          sender.socket.partnerEmail = socket.email;
+        if (sender && me) {
+          // Refresh lists for both
+          sendPendingRequests();
+          
+          // Trigger the sender to refresh their list too
+          const senderRequests = await FriendRequest.find({ receiverEmail: req.senderEmail, status: "pending" });
+          const populatedSenderRequests = await Promise.all(senderRequests.map(async (sr) => {
+              const u = await User.findOne({email: sr.senderEmail});
+              return { id: sr._id, senderEmail: sr.senderEmail, senderCodename: u ? u.codename : "Unknown" };
+          }));
+          sender.socket.emit("pendingRequests", populatedSenderRequests);
 
-          socket.emit("chatStart", { partnerCodename: sender.codename, partnerEmail: req.senderEmail });
-          sender.socket.emit("chatStart", { partnerCodename: me.codename, partnerEmail: socket.email });
+          if (sender.status !== "chatting" && me.status !== "chatting") {
+            sender.status = "chatting";
+            me.status = "chatting";
+            socket.partnerEmail = req.senderEmail;
+            sender.socket.partnerEmail = socket.email;
+
+            socket.emit("chatStart", { partnerCodename: sender.codename, partnerEmail: req.senderEmail });
+            sender.socket.emit("chatStart", { partnerCodename: me.codename, partnerEmail: socket.email });
+          }
         }
-        sendPendingRequests();
       }
-    } catch(e) {}
+    } catch(e) {
+      console.error("Accept Request Error:", e);
+    }
   });
 
   socket.on("reportUser", () => {
